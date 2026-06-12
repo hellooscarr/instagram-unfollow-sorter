@@ -106,6 +106,57 @@ h1 { font-size: 20px; margin: 0 0 10px; font-weight: 700; }
   padding: 4px;
 }
 
+/* Generic primary/danger buttons (used outside the footer too) */
+button.primary {
+  background: var(--blue);
+  color: #fff;
+  border: 1px solid var(--blue);
+  border-radius: 12px;
+  padding: 12px 10px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+button.danger {
+  background: var(--card-bg);
+  color: var(--red);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 10px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+#selected-file { word-break: break-all; }
+
+/* ---------------------------------------------------------------
+   Conflict modal
+--------------------------------------------------------------- */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 10;
+}
+.modal-card {
+  width: 100%;
+  max-width: 360px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: center;
+}
+.modal-card p { margin: 0; }
+
 /* ---------------------------------------------------------------
    Sync screen
 --------------------------------------------------------------- */
