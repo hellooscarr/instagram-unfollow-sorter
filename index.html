@@ -45,10 +45,10 @@
     <div class="upload-card">
       <p class="upload-label">Upload your Instagram data export</p>
       <label class="dropzone" id="dropzone">
-        <input type="file" id="file-input" accept=".zip,.json,application/zip,application/json" multiple style="display:none">
+        <input type="file" id="file-input" accept=".zip,.json,.csv,application/zip,application/json,text/csv" multiple style="display:none">
         <span id="dropzone-text">
           Drop your export ZIP here, or click to choose a file<br>
-          <span class="muted">(or select followers_1.json, followers_2.json … and following.json directly)</span>
+          <span class="muted">(or select followers_1.json, followers_2.json … and following.json directly — or a CSV of accounts not following you back)</span>
         </span>
       </label>
       <p id="upload-error" class="error" style="display:none"></p>
