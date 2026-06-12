@@ -92,40 +92,31 @@ project-u/
 
 ## Deployment
 
-This app is set up to deploy with **Firebase Hosting**, using the
-already-created Firebase project `project-unfollow-f6ad2` (the same
-project that hosts the Firestore sync database). It's also a static
-site, so it works equally well on Vercel, Netlify, or GitHub Pages if
-you'd rather use one of those.
+This app is live on **GitHub Pages**:
 
-### Firebase Hosting (recommended — matches the sync database)
+**https://hellooscarr.github.io/instagram-unfollow-sorter/**
 
-One-time setup, from inside the `project-u/` folder:
+It's a static site (no build step), deployed straight from the `main`
+branch of the [instagram-unfollow-sorter](https://github.com/hellooscarr/instagram-unfollow-sorter)
+repo — the same setup as the PANAM FC bracket app. The Firestore sync
+database (`project-unfollow-f6ad2`) is separate from hosting, so the
+app works the same regardless of where it's hosted.
 
-```bash
-npm install -g firebase-tools
-firebase login          # opens a browser to sign in with the Google
-                         # account that owns project-unfollow-f6ad2
-firebase deploy          # deploys index.html, css/, js/ as a static site
-                         # and publishes firestore.rules
-```
+### Publishing updates
 
-After `firebase deploy` finishes it prints your live URL — something
-like `https://project-unfollow-f6ad2.web.app`. That URL works on any
-phone or computer; enter the same sync code on each device to stay in
-sync.
-
-To publish updates later, just re-run `firebase deploy` from this
-folder.
+1. Edit the files locally (`index.html`, `css/`, `js/`).
+2. On GitHub, open the repo and use **Add file → Upload files** (or
+   edit a file directly in the browser) to commit the changes to
+   `main`.
+3. GitHub Pages rebuilds automatically within about a minute.
 
 ### Firestore security rules
 
 `firestore.rules` restricts reads/writes to the `sorters` collection
-(used for sync codes) and denies everything else. `firebase deploy`
-publishes these automatically — or paste the contents of
-`firestore.rules` into **Firebase Console → Firestore Database →
-Rules → Publish** for `project-unfollow-f6ad2` if you'd rather do it
-by hand.
+(used for sync codes) and denies everything else. These are published
+via **Firebase Console → Firestore Database → Rules → Publish** for
+`project-unfollow-f6ad2` — paste in the contents of `firestore.rules`
+if they ever need to change.
 
 ## Next steps (from the original project brief)
 
@@ -133,7 +124,7 @@ by hand.
 - [x] Drag-and-drop ZIP handling (via JSZip)
 - [x] "How to get your Instagram export" onboarding guide
 - [x] Cross-device sync via sync codes + Firestore
-- [ ] Deploy (`firebase deploy` — see above) and/or a custom domain
+- [x] Deploy to GitHub Pages (see above) — custom domain optional
 - [ ] Stripe one-time checkout for a paid tier (e.g. swipe UI as a
       premium feature, or removing usage limits)
 - [ ] Optional: Tinder-style swipe queue was implemented as the primary
