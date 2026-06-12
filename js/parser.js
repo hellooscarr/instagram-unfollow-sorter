@@ -139,50 +139,74 @@ const Parser = (() => {
     return [...following].filter((u) => !followers.has(u)).sort((a, b) => a.localeCompare(b));
   }
 
-  // Parse a CSV that's *already* a list of accounts (e.g. exported from
-  // another tool as "username,profile_url"). The first row is treated as
-  // a header if it contains a "username" column; otherwise every row's
-  // first column is used as the username. Returns an ordered array of
-  // unique usernames (in file order, not re-sorted).
-  async function parseCSV(file) {
-    const text = await file.text();
-    const lines = text.split(/\r\n|\r|\n/).filter((l) => l.trim().length > 0);
-    if (lines.length === 0) {
-      throw new Error(`"${file.name}" is empty.`);
+  // Shared logic for "already computed" account lists (CSV or Excel):
+  // rows is an array of arrays of cell values (strings). The first row is
+  // treated as a header if it contains a "username" column; otherwise
+  // every row's first column is used as the username. Returns an ordered
+  // array of unique usernames (in file order, not re-sorted).
+  function rowsToUsernames(rows, fileName) {
+    if (rows.length === 0) {
+      throw new Error(`"${fileName}" is empty.`);
     }
 
-    const splitRow = (line) => line.split(',').map((cell) => cell.trim().replace(/^"|"$/g, ''));
-
-    let rows = lines.map(splitRow);
     let usernameIdx = 0;
-
-    const header = rows[0].map((h) => h.toLowerCase());
+    const header = rows[0].map((h) => String(h || '').trim().toLowerCase());
     const headerIdx = header.findIndex((h) => h === 'username' || h === 'usernames' || h === 'handle');
+    let dataRows = rows;
     if (headerIdx !== -1) {
       usernameIdx = headerIdx;
-      rows = rows.slice(1);
+      dataRows = rows.slice(1);
     }
 
     const seen = new Set();
     const usernames = [];
-    rows.forEach((row) => {
-      let value = (row[usernameIdx] || '').trim();
+    dataRows.forEach((row) => {
+      let value = String((row && row[usernameIdx]) || '').trim();
       if (!value) return;
       // Allow a profile URL in this column too — pull the handle out of it.
       const urlMatch = value.match(/instagram\.com\/([^/?#]+)/i);
       if (urlMatch) value = urlMatch[1];
-      value = value.replace(/^@/, '');
+      value = value.replace(/^@/, '').replace(/\/$/, '');
       if (!value || seen.has(value)) return;
       seen.add(value);
       usernames.push(value);
     });
 
     if (usernames.length === 0) {
-      throw new Error(`Could not find any usernames in "${file.name}".`);
+      throw new Error(`Could not find any usernames in "${fileName}".`);
     }
 
     return usernames;
   }
 
-  return { extractUsernames, parseZip, parseJSONFiles, computeNonReciprocal, parseCSV };
+  // Parse a CSV that's *already* a list of accounts (e.g. exported from
+  // another tool as "username,profile_url").
+  async function parseCSV(file) {
+    const text = await file.text();
+    const lines = text.split(/\r\n|\r|\n/).filter((l) => l.trim().length > 0);
+    const splitRow = (line) => line.split(',').map((cell) => cell.trim().replace(/^"|"$/g, ''));
+    const rows = lines.map(splitRow);
+    return rowsToUsernames(rows, file.name);
+  }
+
+  // Parse an Excel workbook (.xlsx) with the same shape — first sheet,
+  // "username"/"profile_url"-style columns (or username in the first
+  // column with no header).
+  async function parseXLSX(file) {
+    if (typeof XLSX === 'undefined') {
+      throw new Error('Excel support failed to load. Try exporting/saving the file as CSV instead.');
+    }
+    const buffer = await file.arrayBuffer();
+    const workbook = XLSX.read(buffer, { type: 'array' });
+    const sheetName = workbook.SheetNames[0];
+    if (!sheetName) {
+      throw new Error(`"${file.name}" doesn't contain any sheets.`);
+    }
+    const sheet = workbook.Sheets[sheetName];
+    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', raw: false })
+      .map((row) => row.map((cell) => String(cell)));
+    return rowsToUsernames(rows, file.name);
+  }
+
+  return { extractUsernames, parseZip, parseJSONFiles, computeNonReciprocal, parseCSV, parseXLSX };
 })();

@@ -7,47 +7,41 @@
 
 const STORAGE_KEY = 'ig_unfollow_sorter_v1';
 const SYNC_CODE_KEY = 'ig_unfollow_sync_code';
-const SYNC_SKIP_KEY = 'ig_unfollow_sync_skip';
 
 let USERNAMES = [];
 let state = { index: 0, decisions: {} };
 let syncId = null;
 let cloudSaveTimer = null;
+let stagedFiles = null;
+let pendingCloud = null;
 
 // ---------------------------------------------------------------
 // Screens
 // ---------------------------------------------------------------
-const syncScreen = document.getElementById('sync-screen');
-const uploadScreen = document.getElementById('upload-screen');
+const startScreen = document.getElementById('start-screen');
 const appScreen = document.getElementById('app-screen');
 const dropzone = document.getElementById('dropzone');
 const fileInput = document.getElementById('file-input');
-const uploadError = document.getElementById('upload-error');
-const uploadProgress = document.getElementById('upload-progress');
+const selectedFileEl = document.getElementById('selected-file');
 const loadSampleBtn = document.getElementById('load-sample-btn');
 const syncCodeInput = document.getElementById('sync-code-input');
-const syncContinueBtn = document.getElementById('sync-continue-btn');
-const syncSkipBtn = document.getElementById('sync-skip-btn');
-const syncStatusEl = document.getElementById('sync-status');
-const syncErrorEl = document.getElementById('sync-error');
+const startContinueBtn = document.getElementById('start-continue-btn');
+const startStatusEl = document.getElementById('start-status');
+const startErrorEl = document.getElementById('start-error');
 const syncIndicator = document.getElementById('sync-indicator');
 const changeSyncBtn = document.getElementById('change-sync-btn');
+const conflictModal = document.getElementById('conflict-modal');
+const conflictLoadBtn = document.getElementById('conflict-load-btn');
+const conflictOverwriteBtn = document.getElementById('conflict-overwrite-btn');
+const conflictCancelBtn = document.getElementById('conflict-cancel-btn');
 
-function showSyncScreen() {
-  syncScreen.style.display = '';
-  uploadScreen.style.display = 'none';
-  appScreen.style.display = 'none';
-}
-
-function showUploadScreen() {
-  syncScreen.style.display = 'none';
-  uploadScreen.style.display = '';
+function showStartScreen() {
+  startScreen.style.display = '';
   appScreen.style.display = 'none';
 }
 
 function showAppScreen() {
-  syncScreen.style.display = 'none';
-  uploadScreen.style.display = 'none';
+  startScreen.style.display = 'none';
   appScreen.style.display = '';
   updateSyncIndicator();
 }
@@ -412,153 +406,58 @@ document.getElementById('reset-btn').addEventListener('click', () => {
     if (syncId) {
       Sync.clear(syncId).catch(() => {});
     }
-    showUploadScreen();
-    resetUploadUI();
+    let savedCode = '';
+    try { savedCode = localStorage.getItem(SYNC_CODE_KEY) || ''; } catch (e) {}
+    syncCodeInput.value = savedCode;
+    resetStartUI();
+    showStartScreen();
   }
 });
 
 // ---------------------------------------------------------------
-// Sync code screen
+// Start screen — messages
 // ---------------------------------------------------------------
-function showSyncError(message) {
-  syncStatusEl.style.display = 'none';
-  syncErrorEl.textContent = message;
-  syncErrorEl.style.display = '';
+function showStartError(message) {
+  startStatusEl.style.display = 'none';
+  startErrorEl.textContent = message;
+  startErrorEl.style.display = '';
 }
 
-function showSyncStatus(message) {
-  syncErrorEl.style.display = 'none';
-  syncStatusEl.textContent = message;
-  syncStatusEl.style.display = '';
+function showStartStatus(message) {
+  startErrorEl.style.display = 'none';
+  startStatusEl.textContent = message;
+  startStatusEl.style.display = '';
 }
 
-async function connectWithSyncCode(code) {
-  syncId = Sync.idFromCode(code);
-  try { localStorage.setItem(SYNC_CODE_KEY, code); } catch (e) {}
-  try { localStorage.removeItem(SYNC_SKIP_KEY); } catch (e) {}
-
-  showSyncStatus('Checking for existing progress…');
-  let cloud = null;
-  try {
-    cloud = await Sync.load(syncId);
-  } catch (e) {
-    showSyncError('Could not reach the sync server. Check your connection and try again.');
-    syncId = null;
-    return;
-  }
-
-  if (cloud && Array.isArray(cloud.usernames) && cloud.usernames.length > 0) {
-    USERNAMES = cloud.usernames;
-    state = { index: cloud.index || 0, decisions: cloud.decisions || {} };
-    saveState();
-    showAppScreen();
-    render();
-    return;
-  }
-
-  const local = loadState();
-  if (local && Array.isArray(local.usernames) && local.usernames.length > 0) {
-    USERNAMES = local.usernames;
-    state = { index: local.index, decisions: local.decisions };
-    saveState();
-    showAppScreen();
-    render();
-    return;
-  }
-
-  showAppScreen();
-  showUploadScreen();
-  resetUploadUI();
+function hideStartMessages() {
+  startErrorEl.style.display = 'none';
+  startStatusEl.style.display = 'none';
 }
 
-syncContinueBtn.addEventListener('click', () => {
-  const code = syncCodeInput.value.trim();
-  if (!code) {
-    showSyncError('Enter a sync code (any word or phrase you\'ll remember).');
-    return;
-  }
-  connectWithSyncCode(code);
-});
-
-syncCodeInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') syncContinueBtn.click();
-});
-
-syncSkipBtn.addEventListener('click', () => {
-  syncId = null;
-  try { localStorage.setItem(SYNC_SKIP_KEY, '1'); } catch (e) {}
-  const local = loadState();
-  if (local) {
-    USERNAMES = local.usernames;
-    state = { index: local.index, decisions: local.decisions };
-    showAppScreen();
-    render();
-  } else {
-    showUploadScreen();
-    resetUploadUI();
-  }
-});
-
-changeSyncBtn.addEventListener('click', () => {
-  syncId = null;
-  try { localStorage.removeItem(SYNC_CODE_KEY); } catch (e) {}
-  try { localStorage.removeItem(SYNC_SKIP_KEY); } catch (e) {}
-  syncCodeInput.value = '';
-  syncErrorEl.style.display = 'none';
-  syncStatusEl.style.display = 'none';
-  showSyncScreen();
-});
+function resetStartUI() {
+  hideStartMessages();
+  stageFiles(null);
+}
 
 // ---------------------------------------------------------------
-// Upload flow
+// File staging (parsed only once the user hits Continue)
 // ---------------------------------------------------------------
-function resetUploadUI() {
-  uploadError.style.display = 'none';
-  uploadProgress.style.display = 'none';
+function stageFiles(files) {
   fileInput.value = '';
-}
-
-function showUploadError(message) {
-  uploadProgress.style.display = 'none';
-  uploadError.textContent = message;
-  uploadError.style.display = '';
-}
-
-async function handleFiles(files) {
-  if (!files || files.length === 0) return;
-  uploadError.style.display = 'none';
-  uploadProgress.style.display = '';
-
-  try {
-    let usernames;
-    if (files.length === 1 && /\.csv$/i.test(files[0].name)) {
-      // Already a "not following back" list (e.g. username,profile_url) —
-      // use it directly, no diffing needed.
-      usernames = await Parser.parseCSV(files[0]);
-    } else {
-      let result;
-      if (files.length === 1 && /\.zip$/i.test(files[0].name)) {
-        result = await Parser.parseZip(files[0]);
-      } else {
-        result = await Parser.parseJSONFiles(Array.from(files));
-      }
-      usernames = Parser.computeNonReciprocal(result.followers, result.following);
-    }
-
-    USERNAMES = usernames;
-    state = { index: 0, decisions: {} };
-    saveState();
-    uploadProgress.style.display = 'none';
-    showAppScreen();
-    render();
-  } catch (err) {
-    showUploadError(err.message || 'Something went wrong reading that file.');
+  if (!files || files.length === 0) {
+    stagedFiles = null;
+    selectedFileEl.style.display = 'none';
+    return;
   }
+  stagedFiles = Array.from(files);
+  selectedFileEl.textContent = 'Selected: ' + stagedFiles.map((f) => f.name).join(', ');
+  selectedFileEl.style.display = '';
+  hideStartMessages();
 }
 
 dropzone.addEventListener('click', () => fileInput.click());
 
-fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
+fileInput.addEventListener('change', (e) => stageFiles(e.target.files));
 
 ['dragenter', 'dragover'].forEach((evt) => {
   dropzone.addEventListener(evt, (e) => {
@@ -573,8 +472,141 @@ fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
   });
 });
 dropzone.addEventListener('drop', (e) => {
-  const files = e.dataTransfer.files;
-  handleFiles(files);
+  e.preventDefault();
+  stageFiles(e.dataTransfer.files);
+});
+
+// Parse staged files into a final username list, regardless of format
+// (ZIP export, individual JSON files, CSV, or Excel).
+async function parseAccountFiles(files) {
+  if (files.length === 1 && /\.csv$/i.test(files[0].name)) {
+    // Already a "not following back" list — use it directly, no diffing.
+    return await Parser.parseCSV(files[0]);
+  }
+  if (files.length === 1 && /\.xlsx$/i.test(files[0].name)) {
+    return await Parser.parseXLSX(files[0]);
+  }
+  let result;
+  if (files.length === 1 && /\.zip$/i.test(files[0].name)) {
+    result = await Parser.parseZip(files[0]);
+  } else {
+    result = await Parser.parseJSONFiles(Array.from(files));
+  }
+  return Parser.computeNonReciprocal(result.followers, result.following);
+}
+
+async function loadFromStagedFiles() {
+  showStartStatus('Reading your file…');
+  try {
+    const usernames = await parseAccountFiles(stagedFiles);
+    USERNAMES = usernames;
+    state = { index: 0, decisions: {} };
+    saveState();
+    hideStartMessages();
+    showAppScreen();
+    render();
+  } catch (err) {
+    showStartError(err.message || 'Something went wrong reading that file.');
+  }
+}
+
+// ---------------------------------------------------------------
+// Start screen — keyword + upload, with conflict handling
+// ---------------------------------------------------------------
+function showConflictModal() {
+  conflictModal.style.display = '';
+}
+
+function hideConflictModal() {
+  conflictModal.style.display = 'none';
+}
+
+startContinueBtn.addEventListener('click', async () => {
+  const code = syncCodeInput.value.trim();
+  if (!code) {
+    showStartError('Enter a keyword (any word or phrase) to continue.');
+    return;
+  }
+
+  hideStartMessages();
+  startContinueBtn.disabled = true;
+  showStartStatus('Checking for existing progress…');
+
+  syncId = Sync.idFromCode(code);
+  try { localStorage.setItem(SYNC_CODE_KEY, code); } catch (e) {}
+
+  let cloud = null;
+  try {
+    cloud = await Sync.load(syncId);
+  } catch (e) {
+    showStartError('Could not reach the sync server. Check your connection and try again.');
+    startContinueBtn.disabled = false;
+    return;
+  }
+
+  const hasCloud = !!(cloud && Array.isArray(cloud.usernames) && cloud.usernames.length > 0);
+  const hasFiles = !!(stagedFiles && stagedFiles.length > 0);
+
+  if (hasCloud && hasFiles) {
+    pendingCloud = cloud;
+    hideStartMessages();
+    startContinueBtn.disabled = false;
+    showConflictModal();
+    return;
+  }
+
+  if (hasCloud) {
+    USERNAMES = cloud.usernames;
+    state = { index: cloud.index || 0, decisions: cloud.decisions || {} };
+    saveState();
+    hideStartMessages();
+    showAppScreen();
+    render();
+    return;
+  }
+
+  if (hasFiles) {
+    await loadFromStagedFiles();
+    startContinueBtn.disabled = false;
+    return;
+  }
+
+  showStartError(`No saved progress found for "${code}" yet. Upload your export above to get started.`);
+  startContinueBtn.disabled = false;
+});
+
+syncCodeInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') startContinueBtn.click();
+});
+
+conflictLoadBtn.addEventListener('click', () => {
+  hideConflictModal();
+  if (!pendingCloud) return;
+  USERNAMES = pendingCloud.usernames;
+  state = { index: pendingCloud.index || 0, decisions: pendingCloud.decisions || {} };
+  pendingCloud = null;
+  saveState();
+  showAppScreen();
+  render();
+});
+
+conflictOverwriteBtn.addEventListener('click', async () => {
+  hideConflictModal();
+  pendingCloud = null;
+  await loadFromStagedFiles();
+});
+
+conflictCancelBtn.addEventListener('click', () => {
+  hideConflictModal();
+  pendingCloud = null;
+});
+
+changeSyncBtn.addEventListener('click', () => {
+  let savedCode = '';
+  try { savedCode = localStorage.getItem(SYNC_CODE_KEY) || ''; } catch (e) {}
+  syncCodeInput.value = savedCode;
+  resetStartUI();
+  showStartScreen();
 });
 
 // ---------------------------------------------------------------
@@ -588,6 +620,8 @@ const SAMPLE_USERNAMES = [
 ];
 
 loadSampleBtn.addEventListener('click', () => {
+  // A quick local-only preview — doesn't require a keyword and doesn't sync.
+  syncId = null;
   USERNAMES = SAMPLE_USERNAMES.slice();
   state = { index: 0, decisions: {} };
   saveState();
@@ -602,10 +636,9 @@ loadSampleBtn.addEventListener('click', () => {
   const saved = loadState();
   let savedCode = null;
   try { savedCode = localStorage.getItem(SYNC_CODE_KEY); } catch (e) {}
-  let skipped = false;
-  try { skipped = localStorage.getItem(SYNC_SKIP_KEY) === '1'; } catch (e) {}
 
   if (savedCode) {
+    syncCodeInput.value = savedCode;
     syncId = Sync.idFromCode(savedCode);
     let cloud = null;
     try {
@@ -617,12 +650,13 @@ loadSampleBtn.addEventListener('click', () => {
     if (cloud && Array.isArray(cloud.usernames) && cloud.usernames.length > 0) {
       USERNAMES = cloud.usernames;
       state = { index: cloud.index || 0, decisions: cloud.decisions || {} };
+      saveState();
       showAppScreen();
       render();
       return;
     }
 
-    if (saved) {
+    if (saved && Array.isArray(saved.usernames) && saved.usernames.length > 0) {
       USERNAMES = saved.usernames;
       state = { index: saved.index, decisions: saved.decisions };
       showAppScreen();
@@ -630,11 +664,11 @@ loadSampleBtn.addEventListener('click', () => {
       return;
     }
 
-    showUploadScreen();
+    showStartScreen();
     return;
   }
 
-  if (saved) {
+  if (saved && Array.isArray(saved.usernames) && saved.usernames.length > 0) {
     USERNAMES = saved.usernames;
     state = { index: saved.index, decisions: saved.decisions };
     showAppScreen();
@@ -642,10 +676,5 @@ loadSampleBtn.addEventListener('click', () => {
     return;
   }
 
-  if (skipped) {
-    showUploadScreen();
-    return;
-  }
-
-  showSyncScreen();
+  showStartScreen();
 })();
