@@ -9,51 +9,45 @@
 <body>
 <div class="app">
 
-  <!-- ===================== Sync screen ===================== -->
-  <section id="sync-screen" class="screen" style="display:none">
+  <!-- ===================== Start screen ===================== -->
+  <section id="start-screen" class="screen" style="display:none">
     <header>
       <h1>Instagram Unfollow Sorter</h1>
       <p class="muted">
-        Pick a sync code so you can pick up your progress on any device —
-        phone, laptop, tablet. Enter the same code each time. Your account
-        lists and swipe decisions will be saved to this app's database
-        under that code (nothing is shared with Instagram).
+        Find accounts you follow that don't follow you back, then swipe to
+        sort them — everything runs locally in your browser.
       </p>
     </header>
 
     <div class="upload-card">
-      <p class="upload-label">Your sync code</p>
+      <p class="upload-label">Your keyword</p>
+      <p class="muted" style="margin:0 0 10px">
+        Pick a word or phrase. Enter the same keyword again — on this device
+        or any other — to pick up right where you left off, with or without
+        re-uploading a file.
+      </p>
       <input type="text" id="sync-code-input" class="sync-input" placeholder="e.g. a word or phrase only you'll use" autocomplete="off">
-      <button class="primary" id="sync-continue-btn" style="width:100%;margin-top:12px;">Continue</button>
-      <p id="sync-status" class="muted" style="display:none"></p>
-      <p id="sync-error" class="error" style="display:none"></p>
     </div>
 
-    <button id="sync-skip-btn" class="link-btn">Skip — use this device only</button>
-  </section>
-
-  <!-- ===================== Upload screen ===================== -->
-  <section id="upload-screen" class="screen" style="display:none">
-    <header>
-      <h1>Instagram Unfollow Sorter</h1>
-      <p class="muted">
-        Find accounts you follow that don't follow you back — everything runs
-        locally in your browser. Nothing is ever uploaded to a server.
-      </p>
-    </header>
-
     <div class="upload-card">
-      <p class="upload-label">Upload your Instagram data export</p>
+      <p class="upload-label">Upload your data</p>
+      <p class="muted" style="margin:0 0 10px">
+        Required the first time you use a keyword. If your keyword already
+        has saved progress, you can skip this.
+      </p>
       <label class="dropzone" id="dropzone">
-        <input type="file" id="file-input" accept=".zip,.json,.csv,application/zip,application/json,text/csv" multiple style="display:none">
+        <input type="file" id="file-input" accept=".zip,.json,.csv,.xlsx,application/zip,application/json,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" multiple style="display:none">
         <span id="dropzone-text">
           Drop your export ZIP here, or click to choose a file<br>
-          <span class="muted">(or select followers_1.json, followers_2.json … and following.json directly — or a CSV of accounts not following you back)</span>
+          <span class="muted">(or select followers_1.json, followers_2.json … and following.json directly — or a CSV/Excel file of accounts not following you back)</span>
         </span>
       </label>
-      <p id="upload-error" class="error" style="display:none"></p>
-      <p id="upload-progress" class="muted" style="display:none">Reading your export…</p>
+      <p id="selected-file" class="muted" style="display:none"></p>
     </div>
+
+    <button class="primary" id="start-continue-btn" style="width:100%;">Continue</button>
+    <p id="start-status" class="muted" style="display:none"></p>
+    <p id="start-error" class="error" style="display:none"></p>
 
     <details class="howto">
       <summary>How do I get my Instagram export?</summary>
@@ -69,6 +63,17 @@
 
     <button id="load-sample-btn" class="link-btn">Try it with sample data</button>
   </section>
+
+  <!-- ===================== Conflict modal ===================== -->
+  <div id="conflict-modal" class="modal-overlay" style="display:none">
+    <div class="modal-card">
+      <p><strong>That keyword already has saved progress.</strong></p>
+      <p class="muted">Load the existing progress, or start over using the file you just selected (this replaces the saved list and resets Keep/Unfollow decisions for this keyword)?</p>
+      <button class="primary" id="conflict-load-btn" style="width:100%;">Load existing progress</button>
+      <button class="danger" id="conflict-overwrite-btn" style="width:100%;">Start over with this file</button>
+      <button class="link-btn" id="conflict-cancel-btn">Cancel</button>
+    </div>
+  </div>
 
   <!-- ===================== Sorter screen ===================== -->
   <section id="app-screen" class="screen" style="display:none">
@@ -127,7 +132,7 @@
       <button id="export-progress-btn">Backup progress (.json)</button>
       <label for="import-file">Restore progress</label>
       <input type="file" id="import-file" accept="application/json" style="display:none">
-      <button id="change-sync-btn">Sync across devices</button>
+      <button id="change-sync-btn">Switch keyword</button>
       <button class="danger" id="reset-btn">Start over / new export</button>
     </footer>
   </section>
