@@ -530,15 +530,22 @@ async function handleFiles(files) {
   uploadProgress.style.display = '';
 
   try {
-    let result;
-    if (files.length === 1 && /\.zip$/i.test(files[0].name)) {
-      result = await Parser.parseZip(files[0]);
+    let usernames;
+    if (files.length === 1 && /\.csv$/i.test(files[0].name)) {
+      // Already a "not following back" list (e.g. username,profile_url) —
+      // use it directly, no diffing needed.
+      usernames = await Parser.parseCSV(files[0]);
     } else {
-      result = await Parser.parseJSONFiles(Array.from(files));
+      let result;
+      if (files.length === 1 && /\.zip$/i.test(files[0].name)) {
+        result = await Parser.parseZip(files[0]);
+      } else {
+        result = await Parser.parseJSONFiles(Array.from(files));
+      }
+      usernames = Parser.computeNonReciprocal(result.followers, result.following);
     }
 
-    const nonReciprocal = Parser.computeNonReciprocal(result.followers, result.following);
-    USERNAMES = nonReciprocal;
+    USERNAMES = usernames;
     state = { index: 0, decisions: {} };
     saveState();
     uploadProgress.style.display = 'none';

@@ -139,5 +139,50 @@ const Parser = (() => {
     return [...following].filter((u) => !followers.has(u)).sort((a, b) => a.localeCompare(b));
   }
 
-  return { extractUsernames, parseZip, parseJSONFiles, computeNonReciprocal };
+  // Parse a CSV that's *already* a list of accounts (e.g. exported from
+  // another tool as "username,profile_url"). The first row is treated as
+  // a header if it contains a "username" column; otherwise every row's
+  // first column is used as the username. Returns an ordered array of
+  // unique usernames (in file order, not re-sorted).
+  async function parseCSV(file) {
+    const text = await file.text();
+    const lines = text.split(/\r\n|\r|\n/).filter((l) => l.trim().length > 0);
+    if (lines.length === 0) {
+      throw new Error(`"${file.name}" is empty.`);
+    }
+
+    const splitRow = (line) => line.split(',').map((cell) => cell.trim().replace(/^"|"$/g, ''));
+
+    let rows = lines.map(splitRow);
+    let usernameIdx = 0;
+
+    const header = rows[0].map((h) => h.toLowerCase());
+    const headerIdx = header.findIndex((h) => h === 'username' || h === 'usernames' || h === 'handle');
+    if (headerIdx !== -1) {
+      usernameIdx = headerIdx;
+      rows = rows.slice(1);
+    }
+
+    const seen = new Set();
+    const usernames = [];
+    rows.forEach((row) => {
+      let value = (row[usernameIdx] || '').trim();
+      if (!value) return;
+      // Allow a profile URL in this column too — pull the handle out of it.
+      const urlMatch = value.match(/instagram\.com\/([^/?#]+)/i);
+      if (urlMatch) value = urlMatch[1];
+      value = value.replace(/^@/, '');
+      if (!value || seen.has(value)) return;
+      seen.add(value);
+      usernames.push(value);
+    });
+
+    if (usernames.length === 0) {
+      throw new Error(`Could not find any usernames in "${file.name}".`);
+    }
+
+    return usernames;
+  }
+
+  return { extractUsernames, parseZip, parseJSONFiles, computeNonReciprocal, parseCSV };
 })();
