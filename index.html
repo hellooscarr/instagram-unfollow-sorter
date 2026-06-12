@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Instagram Unfollow Sorter</title>
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<div class="app">
+
+  <!-- ===================== Sync screen ===================== -->
+  <section id="sync-screen" class="screen" style="display:none">
+    <header>
+      <h1>Instagram Unfollow Sorter</h1>
+      <p class="muted">
+        Pick a sync code so you can pick up your progress on any device —
+        phone, laptop, tablet. Enter the same code each time. Your account
+        lists and swipe decisions will be saved to this app's database
+        under that code (nothing is shared with Instagram).
+      </p>
+    </header>
+
+    <div class="upload-card">
+      <p class="upload-label">Your sync code</p>
+      <input type="text" id="sync-code-input" class="sync-input" placeholder="e.g. a word or phrase only you'll use" autocomplete="off">
+      <button class="primary" id="sync-continue-btn" style="width:100%;margin-top:12px;">Continue</button>
+      <p id="sync-status" class="muted" style="display:none"></p>
+      <p id="sync-error" class="error" style="display:none"></p>
+    </div>
+
+    <button id="sync-skip-btn" class="link-btn">Skip — use this device only</button>
+  </section>
+
+  <!-- ===================== Upload screen ===================== -->
+  <section id="upload-screen" class="screen" style="display:none">
+    <header>
+      <h1>Instagram Unfollow Sorter</h1>
+      <p class="muted">
+        Find accounts you follow that don't follow you back — everything runs
+        locally in your browser. Nothing is ever uploaded to a server.
+      </p>
+    </header>
+
+    <div class="upload-card">
+      <p class="upload-label">Upload your Instagram data export</p>
+      <label class="dropzone" id="dropzone">
+        <input type="file" id="file-input" accept=".zip,.json,application/zip,application/json" multiple style="display:none">
+        <span id="dropzone-text">
+          Drop your export ZIP here, or click to choose a file<br>
+          <span class="muted">(or select followers_1.json, followers_2.json … and following.json directly)</span>
+        </span>
+      </label>
+      <p id="upload-error" class="error" style="display:none"></p>
+      <p id="upload-progress" class="muted" style="display:none">Reading your export…</p>
+    </div>
+
+    <details class="howto">
+      <summary>How do I get my Instagram export?</summary>
+      <ol>
+        <li>In Instagram, go to <strong>Settings → Accounts Center → Your information and permissions → Download your information</strong>.</li>
+        <li>Choose <strong>"Some of your information"</strong> and select only <strong>Followers and following</strong>.</li>
+        <li>Set the format to <strong>JSON</strong> (not HTML) and submit the request.</li>
+        <li>Instagram will notify you when the export is ready to download (usually minutes to a few hours).</li>
+        <li>Download the ZIP and drop it here — or unzip it and select the files from <code>connections/followers_and_following/</code>.</li>
+      </ol>
+      <p class="muted">Your data never leaves this browser tab.</p>
+    </details>
+
+    <button id="load-sample-btn" class="link-btn">Try it with sample data</button>
+  </section>
+
+  <!-- ===================== Sorter screen ===================== -->
+  <section id="app-screen" class="screen" style="display:none">
+    <header>
+      <h1>Instagram Unfollow Sorter</h1>
+      <div class="progress-bar-track"><div class="progress-bar-fill" id="progress-bar"></div></div>
+      <p class="muted" id="progress-text"></p>
+      <div class="stats-row">
+        <span class="keep">♥ Keep: <span id="keep-count">0</span></span>
+        <span class="unfollow">✕ Unfollow: <span id="unfollow-count">0</span></span>
+      </div>
+      <p class="muted" id="sync-indicator" style="display:none"></p>
+    </header>
+
+    <div id="swipe-area" class="swipe-area">
+      <div class="card-stack">
+        <div class="card next-card" id="next-card">
+          <div class="avatar" id="next-avatar"></div>
+          <p class="username" id="next-username"></p>
+          <p class="subtitle">Doesn't follow you back</p>
+        </div>
+        <div class="card top-card" id="card">
+          <span class="counter" id="counter"></span>
+          <div class="overlay overlay-keep" id="overlay-keep">Keep</div>
+          <div class="overlay overlay-unfollow" id="overlay-unfollow">Unfollow</div>
+          <div class="avatar" id="avatar"></div>
+          <p class="username" id="username"></p>
+          <p class="subtitle">Doesn't follow you back</p>
+          <a id="view-profile" class="view-profile-btn" target="_blank" rel="noopener">View profile ↗</a>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="action-btn undo-btn" id="undo-btn" title="Undo">↺</button>
+        <button class="action-btn unfollow-btn" id="unfollow-btn" title="Unfollow">✕</button>
+        <button class="action-btn keep-btn" id="keep-btn" title="Keep">♥</button>
+      </div>
+      <p class="hint">Drag or swipe the card · Arrow keys: ← unfollow, → keep, ↑ view profile, Z undo</p>
+    </div>
+
+    <div id="done-screen" class="done-screen" style="display:none">
+      <h2>All done 🎉</h2>
+      <p class="muted">You've reviewed all <span id="total-count"></span> accounts.</p>
+    </div>
+
+    <div class="queue-section">
+      <button class="queue-header" id="queue-toggle">
+        <span>To unfollow (<span id="queue-count">0</span>)</span>
+        <span id="queue-arrow">▾</span>
+      </button>
+      <ul class="queue-list collapsed" id="unfollow-queue"></ul>
+    </div>
+
+    <footer>
+      <button class="primary" id="export-excel-btn">Export Excel</button>
+      <button id="export-progress-btn">Backup progress (.json)</button>
+      <label for="import-file">Restore progress</label>
+      <input type="file" id="import-file" accept="application/json" style="display:none">
+      <button id="change-sync-btn">Sync across devices</button>
+      <button class="danger" id="reset-btn">Start over / new export</button>
+    </footer>
+  </section>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="js/sync.js"></script>
+<script src="js/parser.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

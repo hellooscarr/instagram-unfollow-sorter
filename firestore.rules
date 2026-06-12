@@ -1,0 +1,21 @@
+rules_version = '2';
+
+// Project U has no real authentication — instead, each device "logs in"
+// with a sync code that gets hashed into a document ID (see js/sync.js).
+// These rules scope all reads/writes to the `sorters` collection so the
+// app can read/write its own sync documents, and deny everything else.
+//
+// Note: anyone who knows (or guesses) another user's exact sync code
+// could read or overwrite that user's document, since there's no
+// password check beyond the code itself. Treat the sync code like a
+// shared secret / unlisted link.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /sorters/{docId} {
+      allow read, write: if true;
+    }
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
